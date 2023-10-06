@@ -1,10 +1,8 @@
-import eventlet
-
-eventlet.monkey_patch()
-
 import json
-from flask import jsonify
-from flask_restx import Namespace, Resource, reqparse
+from flask_cors import CORS
+from flask import Flask, jsonify, request
+from flask_restful import Api, Resource
+
 
 from general_util import setup_logger
 
@@ -13,7 +11,6 @@ try:
 except ImportError:
     pass
 
-chat_resource = Namespace('chat', description='Callback')
 
 chat_invocation_logger = setup_logger("chat_invocations", "./chat_invocations.log")
 
@@ -35,10 +32,9 @@ response_map = {
 }
 
 
-@chat_resource.route('/verifast', methods=['POST'])
 class ChatEndpoint(Resource):
     def post(self):
-        payload = reqparse.request.get_json()
+        payload = request.get_json()
         chat_invocation_logger.info(json.dumps(payload, indent=1))
         query = payload['query']
 
@@ -47,3 +43,13 @@ class ChatEndpoint(Resource):
         else:
             result = response_map['default']
         return jsonify(result)
+
+
+app = Flask(__name__)
+CORS(app)
+api = Api(app)
+
+api.add_resource(ChatEndpoint, '/verifast')
+
+if __name__ == '__main__':
+    app.run(debug=True)  # Set debug to False in a production environment
