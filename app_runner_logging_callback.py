@@ -2,6 +2,7 @@ import json
 from flask_cors import CORS
 from flask import Flask, jsonify, request
 from flask_restful import Api, Resource
+from flask_pymongo import PyMongo
 
 
 from general_util import setup_logger
@@ -11,6 +12,11 @@ try:
 except ImportError:
     pass
 
+app = Flask(__name__)
+CORS(app)
+api = Api(app)
+app.config['MONGO_URI'] = 'mongodb://localhost:27017/verifast'
+mongo = PyMongo(app)
 
 chat_invocation_logger = setup_logger("chat_invocations", "./chat_invocations.log")
 
@@ -43,6 +49,24 @@ class ChatEndpoint(Resource):
         else:
             result = response_map['default']
         return jsonify(result)
+    
+class Feedback(Resource):
+    def post(self):
+        payload = request.get_json()
+        chat_invocation_logger.info(json.dumps(payload, indent=1))
+        user_message = payload.get("user_message", "")
+        backend_response = payload.get("backend_response", "")
+        feedback = payload.get("feedback", "")
+
+        # Store the feedback in the MongoDB collection
+        feedback_collection = mongo.db.feedback
+        feedback_collection.insert_one({
+            "user_message": user_message,
+            "backend_response": backend_response,
+            "feedback": feedback
+        })
+
+        return jsonify({"message": "Feedback stored successfully"})
 
 
 app = Flask(__name__)
@@ -50,6 +74,7 @@ CORS(app)
 api = Api(app)
 
 api.add_resource(ChatEndpoint, '/verifast')
+api.add_resource(Feedback, '/verifast/feedback')
 
 if __name__ == '__main__':
     app.run(debug=True)  # Set debug to False in a production environment
